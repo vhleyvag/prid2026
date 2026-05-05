@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Simulador 2</title>
+<style>
+:root{--bg:#ececec;--frame:#2f2f2f;--panel:#f8f8f8;--border:#d6d6d6;--text:#222;--blue:#2563eb;--green:#15803d;--orange:#d97706;--red:#dc2626;--muted:#666;--grid:#e8e8e8;}
+*{box-sizing:border-box} body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--text);padding:10px;}
+.frame{width:1280px;height:640px;border:8px solid var(--frame);border-radius:28px;background:#efefef;box-shadow:0 14px 30px rgba(0,0,0,.16);padding:14px;overflow:hidden;}
+.grid{display:grid;grid-template-columns:26% 48% 24%;gap:14px;width:100%;height:100%;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;overflow:hidden;padding:16px;}
+.title{font-size:22px;font-weight:700;margin:0 0 10px;display:flex;gap:8px;align-items:center}
+.subtitle{font-size:13px;color:var(--muted);line-height:1.35;margin-bottom:10px}
+label{display:block;font-size:13px;font-weight:700;margin-top:8px} input[type=range], select{width:100%} input[type=number]{width:100%;padding:8px;border:1px solid #ccc;border-radius:10px} button{margin-top:10px;background:var(--blue);color:white;border:none;border-radius:12px;padding:9px 12px;font-weight:700;cursor:pointer} button.alt{background:var(--green)}
+.kpi{padding:8px 10px;border-radius:12px;background:#e8f0ff;margin:6px 0;font-size:14px}
+.visual{position:relative;height:100%;background:white;border:1px solid #ddd;border-radius:15px;overflow:hidden}
+.axis{position:absolute;left:48px;right:24px;bottom:54px;height:3px;background:#222} .tick{position:absolute;bottom:32px;font-size:12px;transform:translateX(-50%)}
+.dot{position:absolute;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #222;background:#cfe1ff} .dot.sample{background:#ffd9b5} .line{position:absolute;width:3px;top:38px;bottom:54px;background:var(--red)}
+.small{font-size:12px;color:var(--muted)} .table{width:100%;border-collapse:collapse;font-size:13px} .table td,.table th{border:1px solid #ddd;padding:6px 7px;text-align:center} .table th{background:#eef4ff}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef4ff;font-size:12px;font-weight:700;margin:2px 2px 0 0} .note{font-size:13px;line-height:1.35;background:#fff7e6;border-left:4px solid var(--orange);padding:8px;border-radius:10px;margin-top:10px}
+@media (max-width:1320px){.frame{width:100%;max-width:1280px;aspect-ratio:1280/640;height:auto}}
+</style></head><body><div class="frame"><div class="grid"><section class="card"><div class="title">🔁 Simulador 2</div><div class="subtitle">Visualiza la variabilidad muestral de x̄ y p̂.</div>
+<label>Tamaño de muestra</label><input id="n" type="range" min="5" max="20" step="1" value="5" oninput="document.getElementById('nout').textContent=this.value"><div class="small">n = <span id="nout">5</span></div>
+<label>Número de muestras</label><input id="reps" type="range" min="10" max="200" step="10" value="50" oninput="document.getElementById('rout').textContent=this.value"><div class="small">muestras = <span id="rout">50</span></div>
+<button onclick="runSim()">Generar muestras</button><div class="note">Pregunta guía: ¿qué ocurre con la dispersión de x̄ cuando aumenta n?</div></section><section class="card"><div class="title">📈 Estadísticos de muchas muestras</div><div class="subtitle">Panel superior: medias muestrales x̄ · Panel inferior: proporciones muestrales p̂.</div>
+<div id="viz" class="visual"></div></section><aside class="card"><div class="title">📝 Lectura</div><div class="kpi">Parámetros poblacionales</div><div class="small">μ = <span id="mu"></span><br>p = <span id="p"></span></div><div class="kpi">Resumen muestral</div><div class="small" id="summary"></div><div class="kpi">Conclusión orientadora</div><div class="small" id="conc"></div></aside></div></div><script>
+const pop = [20,35,45,10,50,60,15,40,30,25,70,18,55,28,32,48,22,65,38,12,44,26,52,16,58,34,42,24,36,14];
+const genders = ['M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H'];
+function mean(a){return a.reduce((x,y)=>x+y,0)/a.length}
+function randSample(n){ const idx=[...Array(pop.length).keys()]; const out=[]; while(out.length<n){ const i=Math.floor(Math.random()*idx.length); out.push(idx.splice(i,1)[0]); } return out; }
+function sd(a){const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)*(x-m))))}
+function runSim(){ const n=+document.getElementById('n').value, reps=+document.getElementById('reps').value; const xb=[], ph=[]; for(let r=0;r<reps;r++){ const ids=randSample(n); const vals=ids.map(i=>pop[i]); const gs=ids.map(i=>genders[i]); xb.push(mean(vals)); ph.push(gs.filter(g=>g==='M').length/n); }
+ const mu=mean(pop), p=genders.filter(g=>g==='M').length/genders.length; document.getElementById('mu').textContent=mu.toFixed(2); document.getElementById('p').textContent=p.toFixed(2);
+ const viz=document.getElementById('viz'); viz.innerHTML='';
+ function panel(data, top, color, maxv){ const width=viz.clientWidth-80; const h=220; const axis=document.createElement('div'); axis.className='axis'; axis.style.bottom=(640-top-h+24)+'px'; }
+ // axes
+ ['xbar','ph'].forEach((k,idx)=>{ const base=idx===0?300:560; const axis=document.createElement('div'); axis.className='axis'; axis.style.bottom=(idx===0?310:60)+'px'; viz.appendChild(axis); });
+ for(let t=0;t<=80;t+=10){ const tick=document.createElement('div'); tick.className='tick'; tick.style.left=(48 + (t/80)*(viz.clientWidth-72))+'px'; tick.style.bottom='288px'; tick.textContent=t; viz.appendChild(tick); }
+ for(let t=0;t<=1.0;t+=0.2){ const tick=document.createElement('div'); tick.className='tick'; tick.style.left=(48 + (t/1)*(viz.clientWidth-72))+'px'; tick.style.bottom='38px'; tick.textContent=t.toFixed(1); viz.appendChild(tick); }
+ xb.forEach((x,i)=>{ const dot=document.createElement('div'); dot.className='dot'; dot.style.background='#cfe1ff'; dot.style.left=(48 + (x/80)*(viz.clientWidth-72))+'px'; dot.style.top=(40 + (i%18)*14)+'px'; viz.appendChild(dot); });
+ ph.forEach((x,i)=>{ const dot=document.createElement('div'); dot.className='dot sample'; dot.style.left=(48 + x*(viz.clientWidth-72))+'px'; dot.style.top=(340 + (i%18)*14)+'px'; viz.appendChild(dot); });
+ const line1=document.createElement('div'); line1.className='line'; line1.style.left=(48 + (mu/80)*(viz.clientWidth-72))+'px'; line1.style.top='30px'; line1.style.bottom='310px'; viz.appendChild(line1);
+ const line2=document.createElement('div'); line2.className='line'; line2.style.left=(48 + p*(viz.clientWidth-72))+'px'; line2.style.top='330px'; line2.style.bottom='60px'; viz.appendChild(line2);
+ document.getElementById('summary').innerHTML='Media de x̄ = '+mean(xb).toFixed(2)+'<br>DE de x̄ = '+sd(xb).toFixed(2)+'<br>Media de p̂ = '+mean(ph).toFixed(2)+'<br>DE de p̂ = '+sd(ph).toFixed(2);
+ document.getElementById('conc').textContent = 'Los estadísticos cambian de una muestra a otra. Sin embargo, al aumentar n suelen concentrarse más cerca del parámetro.';
+ }
+ runSim();
+</script></body></html>

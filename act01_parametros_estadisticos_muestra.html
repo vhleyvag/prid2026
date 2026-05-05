@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Simulador 1</title>
+<style>
+:root{--bg:#ececec;--frame:#2f2f2f;--panel:#f8f8f8;--border:#d6d6d6;--text:#222;--blue:#2563eb;--green:#15803d;--orange:#d97706;--red:#dc2626;--muted:#666;--grid:#e8e8e8;}
+*{box-sizing:border-box} body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--text);padding:10px;}
+.frame{width:1280px;height:640px;border:8px solid var(--frame);border-radius:28px;background:#efefef;box-shadow:0 14px 30px rgba(0,0,0,.16);padding:14px;overflow:hidden;}
+.grid{display:grid;grid-template-columns:26% 48% 24%;gap:14px;width:100%;height:100%;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;overflow:hidden;padding:16px;}
+.title{font-size:22px;font-weight:700;margin:0 0 10px;display:flex;gap:8px;align-items:center}
+.subtitle{font-size:13px;color:var(--muted);line-height:1.35;margin-bottom:10px}
+label{display:block;font-size:13px;font-weight:700;margin-top:8px} input[type=range], select{width:100%} input[type=number]{width:100%;padding:8px;border:1px solid #ccc;border-radius:10px} button{margin-top:10px;background:var(--blue);color:white;border:none;border-radius:12px;padding:9px 12px;font-weight:700;cursor:pointer} button.alt{background:var(--green)}
+.kpi{padding:8px 10px;border-radius:12px;background:#e8f0ff;margin:6px 0;font-size:14px}
+.visual{position:relative;height:100%;background:white;border:1px solid #ddd;border-radius:15px;overflow:hidden}
+.axis{position:absolute;left:48px;right:24px;bottom:54px;height:3px;background:#222} .tick{position:absolute;bottom:32px;font-size:12px;transform:translateX(-50%)}
+.dot{position:absolute;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #222;background:#cfe1ff} .dot.sample{background:#ffd9b5} .line{position:absolute;width:3px;top:38px;bottom:54px;background:var(--red)}
+.small{font-size:12px;color:var(--muted)} .table{width:100%;border-collapse:collapse;font-size:13px} .table td,.table th{border:1px solid #ddd;padding:6px 7px;text-align:center} .table th{background:#eef4ff}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef4ff;font-size:12px;font-weight:700;margin:2px 2px 0 0} .note{font-size:13px;line-height:1.35;background:#fff7e6;border-left:4px solid var(--orange);padding:8px;border-radius:10px;margin-top:10px}
+@media (max-width:1320px){.frame{width:100%;max-width:1280px;aspect-ratio:1280/640;height:auto}}
+</style></head><body><div class="frame"><div class="grid"><section class="card"><div class="title">📊 Simulador 1</div><div class="subtitle">Distingue población, muestra, parámetro y estadístico.</div>
+<div class="kpi">Población conocida: dinero y género de 30 estudiantes.</div>
+<label>Tamaño de muestra</label><input id="n" type="range" min="5" max="15" step="1" value="5" oninput="sample()"><div class="small">n = <span id="nout">5</span></div>
+<button onclick="sample()">Tomar muestra aleatoria</button><button class="alt" onclick="togglePopulation()">Mostrar / ocultar población</button>
+<div class="note">Pregunta guía: ¿qué tanto se parecen x̄ y p̂ a μ y p cuando cambia la muestra?</div></section><section class="card"><div class="title">👥 Población y muestra</div><div class="subtitle">Azul = población completa · Naranja = elementos seleccionados en la muestra.</div>
+<div id="viz" class="visual"></div></section><aside class="card"><div class="title">🧮 Resultados</div>
+<table class="table"><tr><th>Medida</th><th>Población</th><th>Muestra</th></tr>
+<tr><td>Media de dinero</td><td id="mu"></td><td id="xbar"></td></tr>
+<tr><td>Proporción de mujeres</td><td id="p"></td><td id="phat"></td></tr></table>
+<div class="kpi">Lectura sugerida</div><div id="read" class="small"></div>
+<div class="kpi">Muestra actual</div><div id="members" class="small"></div></aside></div></div><script>
+const pop = [
+ {id:1, money:20, g:'M'}, {id:2, money:35, g:'H'}, {id:3, money:45, g:'M'}, {id:4, money:10, g:'H'}, {id:5, money:50, g:'M'},
+ {id:6, money:60, g:'H'}, {id:7, money:15, g:'M'}, {id:8, money:40, g:'H'}, {id:9, money:30, g:'M'}, {id:10, money:25, g:'H'},
+ {id:11, money:70, g:'M'}, {id:12, money:18, g:'H'}, {id:13, money:55, g:'M'}, {id:14, money:28, g:'H'}, {id:15, money:32, g:'M'},
+ {id:16, money:48, g:'H'}, {id:17, money:22, g:'M'}, {id:18, money:65, g:'H'}, {id:19, money:38, g:'M'}, {id:20, money:12, g:'H'},
+ {id:21, money:44, g:'M'}, {id:22, money:26, g:'H'}, {id:23, money:52, g:'M'}, {id:24, money:16, g:'H'}, {id:25, money:58, g:'M'},
+ {id:26, money:34, g:'H'}, {id:27, money:42, g:'M'}, {id:28, money:24, g:'H'}, {id:29, money:36, g:'M'}, {id:30, money:14, g:'H'}
+];
+let showPop=true, current=[];
+function mean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length}
+function propWomen(arr){return arr.filter(d=>d.g==='M').length/arr.length}
+function randSample(n){ const copy=[...pop]; const out=[]; while(out.length<n){const i=Math.floor(Math.random()*copy.length); out.push(copy.splice(i,1)[0]);} return out; }
+function sample(){ const n=+document.getElementById('n').value; document.getElementById('nout').textContent=n; current=randSample(n); render(); }
+function togglePopulation(){showPop=!showPop; render();}
+function render(){ const viz=document.getElementById('viz'); viz.innerHTML='<div class="axis"></div>';
+ for(let t=0;t<=80;t+=10){ const tick=document.createElement('div'); tick.className='tick'; tick.style.left=(48 + (t/80)*(viz.clientWidth-72))+'px'; tick.textContent=t; viz.appendChild(tick); }
+ const mu=mean(pop.map(d=>d.money)); const p=propWomen(pop);
+ const xbar=mean(current.map(d=>d.money)); const ph=propWomen(current);
+ document.getElementById('mu').textContent=mu.toFixed(2); document.getElementById('p').textContent=p.toFixed(2); document.getElementById('xbar').textContent=xbar.toFixed(2); document.getElementById('phat').textContent=ph.toFixed(2);
+ const line=document.createElement('div'); line.className='line'; line.style.left=(48 + (mu/80)*(viz.clientWidth-72))+'px'; viz.appendChild(line);
+ if(showPop){ pop.forEach((d,i)=>{ const dot=document.createElement('div'); dot.className='dot'; dot.style.left=(48 + (d.money/80)*(viz.clientWidth-72))+'px'; dot.style.top=(80 + (i%10)*38)+'px'; viz.appendChild(dot); }); }
+ current.forEach((d,i)=>{ const dot=document.createElement('div'); dot.className='dot sample'; dot.style.left=(48 + (d.money/80)*(viz.clientWidth-72))+'px'; dot.style.top=(480 - (i%10)*24)+'px'; viz.appendChild(dot); });
+ const dm=(xbar-mu).toFixed(2); const dp=(ph-p).toFixed(2);
+ document.getElementById('read').textContent = 'x̄ y p̂ cambian según la muestra. En esta muestra, x̄ difiere de μ en '+dm+' y p̂ difiere de p en '+dp+'.';
+ document.getElementById('members').textContent=current.map(d=>'#'+d.id+' ('+d.g+', $'+d.money+')').join(', ');
+ }
+ sample();
+</script></body></html>
