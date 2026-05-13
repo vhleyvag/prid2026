@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador 1</title>
+<style>
+:root{
+  --bg:#ececec;--frame:#2f2f2f;--panel:#f8f8f8;--border:#d6d6d6;--text:#222;
+  --blue:#2563eb;--green:#15803d;--orange:#d97706;--red:#dc2626;--muted:#666;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);
+  font-family:Arial,Helvetica,sans-serif;color:var(--text);padding:10px;
+}
+.frame{
+  width:1280px;height:640px;border:8px solid var(--frame);border-radius:28px;background:#efefef;
+  box-shadow:0 14px 30px rgba(0,0,0,.16);padding:14px;overflow:hidden;
+}
+.grid{display:grid;grid-template-columns:26% 48% 24%;gap:14px;width:100%;height:100%}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;overflow:hidden;padding:16px;min-width:0}
+.plotcard{display:flex;flex-direction:column;min-height:0}
+.title{font-size:22px;font-weight:700;margin:0 0 10px;display:flex;gap:8px;align-items:center}
+.subtitle{font-size:13px;color:var(--muted);line-height:1.35;margin-bottom:10px}
+label{display:block;font-size:13px;font-weight:700;margin-top:8px}
+input[type=range]{width:100%}
+button{margin-top:10px;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:9px 12px;font-weight:700;cursor:pointer;margin-right:6px}
+button.alt{background:var(--green)}
+button.warn{background:var(--orange)}
+button.ghost{background:#fff;color:#333;border:1px solid #bbb}
+.controls{display:flex;flex-direction:column;gap:8px}
+.controls button{margin-top:0;margin-right:0;width:100%}
+.kpi{padding:8px 10px;border-radius:12px;background:#e8f0ff;margin:6px 0;font-size:14px}
+.visual{position:relative;flex:1 1 auto;height:auto;min-height:360px;background:#fff;border:1px solid #ddd;border-radius:15px;overflow:hidden;margin-top:4px}
+.axis{position:absolute;left:64px;right:34px;height:3px;background:#222}
+.tick{position:absolute;font-size:12px;transform:translateX(-50%);color:#333;white-space:nowrap}
+.xlabel{position:absolute;left:0;right:0;text-align:center;font-size:13px;font-weight:700;color:#333}
+.panelLabel{position:absolute;left:16px;top:12px;font-size:13px;font-weight:700;color:#333;background:#fff;padding:4px 8px;border-radius:999px;border:1px solid #ddd;max-width:70%}
+.groupLabel{position:absolute;left:18px;font-size:12px;font-weight:700;color:#555;background:#fff;padding:2px 6px;border-radius:999px;border:1px solid #ddd}
+.dot{position:absolute;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #222;background:#cfe1ff;cursor:pointer;touch-action:none}
+.dot.sample{width:24px;height:24px;background:rgba(255,217,181,.35);border:3px solid var(--orange);box-shadow:0 0 0 3px rgba(217,119,6,.12)}
+.dot.hiddenBase{opacity:.22}
+.line{position:absolute;width:3px;background:var(--red)}
+.lineLabel{position:absolute;font-size:12px;font-weight:700;color:var(--red);background:#fff;padding:2px 6px;border-radius:999px;border:1px solid #f3c4c4}
+.small{font-size:12px;color:var(--muted);line-height:1.4}
+.table{width:100%;border-collapse:collapse;font-size:13px}.table td,.table th{border:1px solid #ddd;padding:6px 7px;text-align:center;word-break:break-word}.table th{background:#eef4ff}
+.note{font-size:13px;line-height:1.35;background:#fff7e6;border-left:4px solid var(--orange);padding:8px;border-radius:10px;margin-top:10px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px}.swatch{width:14px;height:14px;border-radius:50%;border:2px solid #222;display:inline-block}.swatch.pop{background:#cfe1ff}.swatch.sample{background:#ffd9b5;border-color:var(--orange);width:18px;height:18px}
+.tooltip{position:absolute;display:none;pointer-events:none;background:#111;color:#fff;padding:7px 9px;border-radius:10px;font-size:12px;line-height:1.25;max-width:180px;z-index:10;box-shadow:0 8px 18px rgba(0,0,0,.18)}
+@media (max-width:1320px){.frame{width:100%;max-width:1280px;aspect-ratio:1280/640;height:auto}}
+@media (max-width:900px){
+  body{display:block}
+  .frame{height:auto;aspect-ratio:auto;border-width:6px;padding:10px}
+  .grid{grid-template-columns:1fr;height:auto}
+  .card{padding:14px}
+  .title{font-size:18px}
+  .subtitle{font-size:12px}
+  .panelLabel{max-width:82%;font-size:12px}
+  .visual{min-height:500px}
+  .table{font-size:12px}
+  .tick{font-size:11px}
+  .xlabel{font-size:12px}
+  .groupLabel{font-size:11px;left:12px}
+  .panelLabel{left:12px}
+}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="grid">
+    <section class="card">
+      <div class="title">📊 Simulador 1</div>
+      <div class="subtitle">Distingue población, muestra, parámetro y estadístico.</div>
+      <div class="kpi">Población conocida: dinero y género de 30 estudiantes.</div>
+      <label for="n">Tamaño de muestra</label>
+      <input id="n" type="range" min="2" max="29" step="1" value="5">
+      <div class="small">n = <span id="nout">5</span></div>
+      <div class="controls">
+        <button onclick="sample()">Tomar muestra aleatoria</button>
+        <button class="alt" onclick="togglePopulation()">Mostrar / ocultar población</button>
+        <button class="warn" onclick="toggleSample()">Mostrar / ocultar muestra</button>
+        <button class="ghost" onclick="downloadSample()">Descargar muestra actual</button>
+      </div>
+      <div class="note">Pregunta guía: ¿qué tanto se parecen la media muestral <strong>x̄</strong> y la proporción muestral <strong>p̂</strong> a la media poblacional <strong>μ</strong> y a la proporción poblacional <strong>p</strong> cuando cambia la muestra?</div>
+      <div class="legend"><span><i class="swatch pop"></i>Población</span><span><i class="swatch sample"></i>Muestra actual</span></div>
+    </section>
+    <section class="card plotcard">
+      <div class="title">👥 Población y muestra</div>
+      <div class="subtitle">Azul = población completa · Naranja = elementos seleccionados en la muestra. La muestra se dibuja exactamente sobre los casos de la población de donde fue extraída.</div>
+      <div id="viz" class="visual"></div>
+    </section>
+    <aside class="card">
+      <div class="title">🧮 Resultados</div>
+      <table class="table">
+        <tr><th>Medida</th><th>Población</th><th>Muestra actual</th></tr>
+        <tr><td>Media de dinero</td><td id="mu"></td><td id="xbar"></td></tr>
+        <tr><td>Proporción de mujeres</td><td id="p"></td><td id="phat"></td></tr>
+      </table>
+      <div class="kpi">Lectura sugerida</div><div id="read" class="small"></div>
+      <div class="kpi">Qué significa cada símbolo</div>
+      <div class="small">μ = media poblacional<br>p = proporción poblacional de mujeres<br>x̄ = media de la muestra actual<br>p̂ = proporción de mujeres en la muestra actual</div>
+      <div class="kpi">Muestra actual</div><div id="members" class="small"></div>
+    </aside>
+  </div>
+</div>
+<script>
+const pop = [
+ {id:1, money:20, g:'M'}, {id:2, money:35, g:'H'}, {id:3, money:45, g:'M'}, {id:4, money:10, g:'H'}, {id:5, money:50, g:'M'},
+ {id:6, money:60, g:'H'}, {id:7, money:15, g:'M'}, {id:8, money:40, g:'H'}, {id:9, money:30, g:'M'}, {id:10, money:25, g:'H'},
+ {id:11, money:70, g:'M'}, {id:12, money:18, g:'H'}, {id:13, money:55, g:'M'}, {id:14, money:28, g:'H'}, {id:15, money:32, g:'M'},
+ {id:16, money:48, g:'H'}, {id:17, money:22, g:'M'}, {id:18, money:65, g:'H'}, {id:19, money:38, g:'M'}, {id:20, money:12, g:'H'},
+ {id:21, money:44, g:'M'}, {id:22, money:26, g:'H'}, {id:23, money:52, g:'M'}, {id:24, money:16, g:'H'}, {id:25, money:58, g:'M'},
+ {id:26, money:34, g:'H'}, {id:27, money:42, g:'M'}, {id:28, money:24, g:'H'}, {id:29, money:36, g:'M'}, {id:30, money:14, g:'H'}
+];
+let showPop=true, showSample=true, current=[];
+function mean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length}
+function propWomen(arr){return arr.filter(d=>d.g==='M').length/arr.length}
+function randSample(n){ const copy=[...pop]; const out=[]; while(out.length<n){const i=Math.floor(Math.random()*copy.length); out.push(copy.splice(i,1)[0]);} return out; }
+function sample(){ const n=+document.getElementById('n').value; document.getElementById('nout').textContent=n; current=randSample(n); render(); }
+function togglePopulation(){showPop=!showPop; render();}
+function toggleSample(){showSample=!showSample; render();}
+function attachTip(dot, d, viz){
+  const tip = document.getElementById('tooltip');
+  tip.innerHTML = 'Est. #'+d.id+'<br>Dinero: $'+d.money+'<br>Género: '+(d.g==='M'?'Mujer':'Hombre');
+  const show = (ev)=>{
+    const rect = viz.getBoundingClientRect();
+    let clientX = ev.clientX, clientY = ev.clientY;
+    if(ev.touches && ev.touches[0]){clientX = ev.touches[0].clientX; clientY = ev.touches[0].clientY;}
+    let x = clientX - rect.left + 12;
+    let y = clientY - rect.top - 10;
+    if(x > viz.clientWidth - 170) x = viz.clientWidth - 170;
+    if(y < 10) y = 10;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+    tip.style.display='block';
+  };
+  const move = (ev)=>{ if(tip.style.display==='block') show(ev); };
+  const hide = ()=>{ tip.style.display='none'; };
+  dot.addEventListener('mousedown', show);
+  dot.addEventListener('mousemove', move);
+  dot.addEventListener('mouseup', hide);
+  dot.addEventListener('mouseleave', hide);
+  dot.addEventListener('touchstart', show, {passive:true});
+  dot.addEventListener('touchmove', move, {passive:true});
+  dot.addEventListener('touchend', hide);
+  dot.addEventListener('touchcancel', hide);
+}
+function computePositions(viz){
+  const compact = viz.clientWidth < 560;
+  const left = compact ? 46 : 64;
+  const right = compact ? 20 : 34;
+  const usable = viz.clientWidth - left - right;
+  const axisY = viz.clientHeight - (compact ? 104 : 118);
+  const topY = compact ? 56 : 62;
+  const plotHeight = axisY - topY - 18;
+  const rowGap = Math.max(26, Math.min(42, plotHeight / 6));
+  const femaleBase = topY + plotHeight * 0.26;
+  const maleBase = topY + plotHeight * 0.58;
+  const positions = {};
+  ['M','H'].forEach(g=>{
+    const subset = pop.filter(d=>d.g===g).sort((a,b)=>a.money-b.money || a.id-b.id);
+    subset.forEach((d, idx)=>{
+      const row = idx % 3;
+      const x = left + (d.money/80)*usable;
+      const y = (g==='M' ? femaleBase : maleBase) + row*rowGap;
+      positions[d.id] = {x,y};
+    });
+  });
+  return {positions, usable, axisY, topY, femaleBase, maleBase, rowGap, left};
+}
+function render(){
+  const viz=document.getElementById('viz');
+  viz.innerHTML='<div id="tooltip" class="tooltip"></div><div class="panelLabel">Dinero que trae cada estudiante</div>';
+  const compact = viz.clientWidth < 560;
+  const {positions, usable, axisY, femaleBase, maleBase, left} = computePositions(viz);
+  const axis=document.createElement('div'); axis.className='axis'; axis.style.left=left+'px'; axis.style.right=(compact?20:34)+'px'; axis.style.top=axisY+'px'; axis.style.bottom='auto'; viz.appendChild(axis);
+  const xlabel=document.createElement('div'); xlabel.className='xlabel'; xlabel.textContent='Dinero (en pesos)'; xlabel.style.top=(axisY+38)+'px'; xlabel.style.bottom='auto'; viz.appendChild(xlabel);
+  for(let t=0;t<=80;t+=10){
+    const tick=document.createElement('div'); tick.className='tick'; tick.style.left=(left + (t/80)*usable)+'px'; tick.style.top=(axisY+14)+'px'; tick.style.bottom='auto'; tick.textContent=t; viz.appendChild(tick);
+  }
+  const gl1=document.createElement('div'); gl1.className='groupLabel'; gl1.textContent='Mujeres'; gl1.style.top=(femaleBase-26)+'px'; viz.appendChild(gl1);
+  const gl2=document.createElement('div'); gl2.className='groupLabel'; gl2.textContent='Hombres'; gl2.style.top=(maleBase-26)+'px'; viz.appendChild(gl2);
+
+  const mu=mean(pop.map(d=>d.money)); const p=propWomen(pop);
+  const xbar=mean(current.map(d=>d.money)); const ph=propWomen(current);
+  document.getElementById('mu').textContent=mu.toFixed(2);
+  document.getElementById('p').textContent=p.toFixed(2);
+  document.getElementById('xbar').textContent=xbar.toFixed(2);
+  document.getElementById('phat').textContent=ph.toFixed(2);
+
+  const line=document.createElement('div'); line.className='line'; line.style.left=(left + (mu/80)*usable)+'px'; line.style.top=(compact?50:54)+'px'; line.style.bottom=(viz.clientHeight-axisY)+'px'; viz.appendChild(line);
+  const lab=document.createElement('div'); lab.className='lineLabel'; lab.style.left=(left + (mu/80)*usable - 16)+'px'; lab.style.top=(compact?22:26)+'px'; lab.textContent='μ'; viz.appendChild(lab);
+
+  const currentIds = new Set(current.map(d=>d.id));
+  pop.forEach((d)=>{
+    const pos=positions[d.id];
+    if(showPop){
+      const dot=document.createElement('div');
+      dot.className='dot'+(showSample && currentIds.has(d.id) ? ' hiddenBase' : '');
+      dot.style.left=pos.x+'px'; dot.style.top=pos.y+'px';
+      attachTip(dot,d,viz); viz.appendChild(dot);
+    }
+    if(showSample && currentIds.has(d.id)){
+      const s=document.createElement('div'); s.className='dot sample'; s.style.left=pos.x+'px'; s.style.top=pos.y+'px';
+      attachTip(s,d,viz); viz.appendChild(s);
+    }
+  });
+  const dm=(xbar-mu).toFixed(2); const dp=(ph-p).toFixed(2);
+  document.getElementById('read').innerHTML='En esta muestra, <strong>x̄</strong> difiere de <strong>μ</strong> en '+dm+' pesos y <strong>p̂</strong> difiere de <strong>p</strong> en '+dp+'. Esto ayuda a observar que los estadísticos dependen de la muestra seleccionada.';
+  document.getElementById('members').textContent=current.map(d=>'#'+d.id+' ('+(d.g==='M'?'Mujer':'Hombre')+', $'+d.money+')').join(', ');
+}
+function downloadSample(){
+  if(!current.length) return;
+  const rows = [['ID','Dinero_pesos','Genero','Es_mujer_0_1']].concat(current.map(d=>[d.id,d.money,d.g==='M'?'Mujer':'Hombre',d.g==='M'?1:0]));
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'muestra_actual_simulador1.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById('n').addEventListener('input', sample);
+window.addEventListener('resize', ()=>render());
+sample();
+</script>
+</body>
+</html>
