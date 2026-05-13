@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador 2 · Variabilidad muestral</title>
+<style>
+:root{
+  --bg:#ececec; --frame:#2f2f2f; --panel:#f8f8f8; --border:#d6d6d6; --text:#222;
+  --blue:#2563eb; --green:#15803d; --orange:#d97706; --red:#dc2626; --muted:#666; --purple:#6d28d9;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg);
+  font-family:Arial,Helvetica,sans-serif; color:var(--text); padding:10px;
+}
+.frame{
+  width:1280px; height:640px; border:8px solid var(--frame); border-radius:28px; background:#efefef;
+  box-shadow:0 14px 30px rgba(0,0,0,.16); padding:14px; overflow:hidden;
+}
+.grid{display:grid; grid-template-columns:26% 48% 24%; gap:14px; width:100%; height:100%}
+.card{background:var(--panel); border:1px solid var(--border); border-radius:18px; overflow:hidden; padding:16px; min-width:0}
+.plotcard{display:flex;flex-direction:column;min-height:0}
+.title{font-size:22px; font-weight:700; margin:0 0 10px; display:flex; gap:8px; align-items:center}
+.subtitle{font-size:13px; color:var(--muted); line-height:1.35; margin-bottom:10px}
+label{display:block; font-size:13px; font-weight:700; margin-top:8px}
+input[type=range]{width:100%}
+button{
+  margin-top:10px; background:var(--blue); color:#fff; border:none; border-radius:12px; padding:9px 12px;
+  font-weight:700; cursor:pointer; margin-right:6px;
+}
+button.alt{background:var(--green)}
+button.ghost{background:#fff; color:#222; border:1px solid #cfcfcf}
+button.toggle.active{background:var(--purple); color:#fff}
+button.slim{padding:7px 10px; font-size:12px}
+.kpi{padding:8px 10px; border-radius:12px; background:#e8f0ff; margin:6px 0; font-size:14px}
+.visual{position:relative; flex:1 1 auto; height:auto; min-height:360px; background:#fff; border:1px solid #ddd; border-radius:15px; overflow:hidden; margin-top:4px}
+.axis{position:absolute; left:64px; right:34px; bottom:110px; height:3px; background:#222}
+.tick{position:absolute; bottom:82px; font-size:12px; transform:translateX(-50%); color:#333}
+.xlabel{position:absolute; left:0; right:0; bottom:34px; text-align:center; font-size:13px; font-weight:700; color:#333}
+.panelTag{
+  position:absolute; left:16px; top:12px; font-size:13px; font-weight:700; background:#fff; padding:4px 8px;
+  border-radius:999px; border:1px solid #ddd
+}
+.dot{
+  position:absolute; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
+  border:2px solid #222; background:#cfe1ff; cursor:pointer;
+}
+.dot.phat{background:#ffd9b5}
+.line{position:absolute; width:3px; top:54px; bottom:110px; background:var(--red)}
+.lineLabel{
+  position:absolute; font-size:12px; font-weight:700; color:var(--red); background:#fff; padding:2px 6px;
+  border-radius:999px; border:1px solid #f3c4c4
+}
+.small{font-size:12px; color:var(--muted); line-height:1.4}
+.note{font-size:13px; line-height:1.35; background:#fff7e6; border-left:4px solid var(--orange); padding:8px; border-radius:10px; margin-top:10px}
+.toolbar{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0}
+.controls{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.controls button{margin-top:0;margin-right:0;width:100%}
+.tooltip{
+  position:absolute; display:none; min-width:132px; max-width:190px; background:rgba(34,34,34,.96); color:#fff;
+  font-size:12px; line-height:1.3; padding:8px 10px; border-radius:10px; pointer-events:none; z-index:50;
+  box-shadow:0 8px 20px rgba(0,0,0,.2)
+}
+.legend{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
+.swatch{display:inline-block; width:14px; height:14px; border-radius:50%; border:2px solid #222; margin-right:6px; vertical-align:middle}
+.swatch.xbar{background:#cfe1ff}.swatch.phat{background:#ffd9b5}.swatch.param{background:#fff; border-color:var(--red)}
+.controlgroup{margin-top:10px}
+@media (max-width:1320px){.frame{width:100%;max-width:1280px;aspect-ratio:1280/640;height:auto}}
+@media (max-width:900px){body{display:block}.frame{height:auto;aspect-ratio:auto;border-width:6px;padding:10px}.grid{grid-template-columns:1fr;height:auto}.card{padding:14px}.title{font-size:18px}.subtitle{font-size:12px}.visual{min-height:470px}.tick{font-size:11px}.xlabel{font-size:12px}.panelTag{left:12px;font-size:12px}}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="grid">
+    <section class="card">
+      <div class="title">🔁 Simulador 2</div>
+      <div class="subtitle">Visualiza la variabilidad muestral de las medias y las proporciones muestrales.</div>
+
+      <label for="n">Tamaño de muestra</label>
+      <input id="n" type="range" min="2" max="29" step="1" value="8">
+      <div class="small">n = <span id="nout">8</span></div>
+
+      <label for="reps">Número de muestras</label>
+      <input id="reps" type="range" min="10" max="200" step="10" value="50">
+      <div class="small">muestras = <span id="rout">50</span></div>
+
+      <div class="controls">
+        <button class="slim" onclick="runSim()">Generar muestras</button>
+        <button id="btnX" class="toggle active" onclick="setView('xbar')">Ver medias muestrales</button>
+        <button id="btnP" class="toggle ghost" onclick="setView('phat')">Ver proporciones muestrales</button>
+        <button id="fitBtn" class="slim ghost" onclick="setFit(true)">Ajustar gráfica</button>
+        <button id="resetFitBtn" class="slim ghost" onclick="setFit(false)">Restablecer ajuste</button>
+        <button class="slim alt" onclick="downloadValues()">Descargar</button>
+      </div>
+
+      <div class="note">
+        Pregunta guía: ¿qué ocurre con la dispersión de las <strong>medias muestrales</strong> y de las
+        <strong>proporciones muestrales</strong> cuando aumenta el tamaño de la muestra?
+      </div>
+    </section>
+
+    <section class="card plotcard">
+      <div class="title">📈 Distribución de estadísticos</div>
+      <div class="subtitle">Se muestra una sola gráfica a la vez. Usa los botones para alternar la visualización.</div>
+      <div id="viz" class="visual">
+        <div id="tooltip" class="tooltip"></div>
+      </div>
+    </section>
+
+    <aside class="card">
+      <div class="title">📝 Lectura</div>
+      <div class="kpi">Parámetros poblacionales</div>
+      <div class="small">μ = <span id="mu"></span><br>p = <span id="p"></span></div>
+
+      <div class="kpi">Resumen de las muestras generadas</div>
+      <div class="small" id="summary"></div>
+
+      <div class="kpi">Qué significan estos resultados</div>
+      <div class="small">
+        <strong>Promedio de las medias muestrales</strong>: valor central de todas las x̄ generadas.<br>
+        <strong>Desviación estándar de las medias muestrales</strong>: qué tanto varían entre sí las x̄.<br><br>
+        <strong>Promedio de las proporciones muestrales</strong>: valor central de todas las p̂ generadas.<br>
+        <strong>Desviación estándar de las proporciones muestrales</strong>: qué tanto varían entre sí las p̂.
+      </div>
+
+      <div class="kpi">Conclusión orientadora</div>
+      <div class="small" id="conc"></div>
+
+      <div class="legend">
+        <span><i class="swatch xbar"></i>x̄ o valor observado</span>
+        <span><i class="swatch phat"></i>p̂ o valor observado</span>
+        <span><i class="swatch param"></i>parámetro poblacional</span>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const pop = [20,35,45,10,50,60,15,40,30,25,70,18,55,28,32,48,22,65,38,12,44,26,52,16,58,34,42,24,36,14];
+const genders = ['M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H','M','H'];
+let currentView = 'xbar';
+let fitMode = false;
+let currentData = { xb: [], ph: [], mu: 0, p: 0, reps: 0, n: 0 };
+
+function mean(a){ return a.reduce((x,y)=>x+y,0)/a.length; }
+function sd(a){ const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)*(x-m)))); }
+function randSample(n){
+  const idx=[...Array(pop.length).keys()], out=[];
+  while(out.length<n){
+    const i=Math.floor(Math.random()*idx.length);
+    out.push(idx.splice(i,1)[0]);
+  }
+  return out;
+}
+function setView(view){
+  currentView = view;
+  document.getElementById('btnX').className = 'toggle ' + (view==='xbar' ? 'active' : 'ghost');
+  document.getElementById('btnP').className = 'toggle ' + (view==='phat' ? 'active' : 'ghost');
+  drawGraph();
+}
+function setFit(active){
+  fitMode = active;
+  document.getElementById('fitBtn').className = 'slim ' + (active ? 'active' : 'ghost');
+  document.getElementById('resetFitBtn').className = 'slim ' + (!active ? 'active' : 'ghost');
+  drawGraph();
+}
+function updateReadouts(){
+  document.getElementById('nout').textContent = document.getElementById('n').value;
+  document.getElementById('rout').textContent = document.getElementById('reps').value;
+}
+function runSim(){
+  const n = +document.getElementById('n').value;
+  const reps = +document.getElementById('reps').value;
+  const xb=[], ph=[];
+  for(let r=0;r<reps;r++){
+    const ids=randSample(n);
+    const vals=ids.map(i=>pop[i]);
+    const gs=ids.map(i=>genders[i]);
+    xb.push(mean(vals));
+    ph.push(gs.filter(g=>g==='M').length/n);
+  }
+  currentData = {
+    xb, ph, n, reps,
+    mu: mean(pop),
+    p: genders.filter(g=>g==='M').length/genders.length
+  };
+  document.getElementById('mu').textContent = currentData.mu.toFixed(2);
+  document.getElementById('p').textContent = currentData.p.toFixed(2);
+  document.getElementById('summary').innerHTML =
+    'Promedio de las medias muestrales = ' + mean(xb).toFixed(2) + '<br>' +
+    'Desv. est. de las medias muestrales = ' + sd(xb).toFixed(2) + '<br><br>' +
+    'Promedio de las proporciones muestrales = ' + mean(ph).toFixed(2) + '<br>' +
+    'Desv. est. de las proporciones muestrales = ' + sd(ph).toFixed(2);
+  document.getElementById('conc').textContent =
+    'Los estadísticos cambian de una muestra a otra. Cuando aumenta n, las medias y proporciones muestrales suelen concentrarse más cerca del parámetro, aunque no dejan de variar.';
+  drawGraph();
+}
+function stackPoints(values, mapX, axisY, topY){
+  const bins = {};
+  const out = [];
+  const maxLevelsDefault = Math.max(1, Math.floor((axisY - topY - 22)/16));
+  values.forEach((v, idx) => {
+    const x = mapX(v);
+    const key = Math.round(x/10)*10;
+    const level = bins[key] || 0;
+    bins[key] = level + 1;
+    let y;
+    if(fitMode){
+      const levelsInBin = bins[key];
+      const maxLevelsDynamic = Math.max(maxLevelsDefault, levelsInBin);
+      const spacing = Math.max(6, (axisY - topY - 22) / maxLevelsDynamic);
+      y = axisY - 12 - level*spacing;
+      if(y < topY + 10) y = topY + 10;
+    } else {
+      y = axisY - 12 - level*16;
+    }
+    out.push({value:v, x, y, index: idx+1, level});
+  });
+  return out;
+}
+function drawGraph(){
+  const viz = document.getElementById('viz');
+  viz.innerHTML = '<div id="tooltip" class="tooltip"></div>';
+  const tip = document.getElementById('tooltip');
+  const compact = viz.clientWidth < 560;
+  const left = compact ? 46 : 64;
+  const right = compact ? 20 : 34;
+  const usable = viz.clientWidth - left - right;
+  const axisY = viz.clientHeight - (compact ? 104 : 110);
+  const topY = compact ? 52 : 52;
+  const data = currentView==='xbar' ? currentData.xb : currentData.ph;
+
+  const tag = document.createElement('div');
+  tag.className = 'panelTag';
+  tag.textContent = currentView==='xbar' ? 'Medias muestrales x̄' : 'Proporciones muestrales p̂';
+  viz.appendChild(tag);
+
+  const axis = document.createElement('div');
+  axis.className = 'axis';
+  axis.style.left = left + 'px';
+  axis.style.right = right + 'px';
+  axis.style.top = axisY + 'px';
+  axis.style.bottom = 'auto';
+  viz.appendChild(axis);
+
+  const xlabel = document.createElement('div');
+  xlabel.className = 'xlabel';
+  xlabel.textContent = currentView==='xbar' ? 'Valores de x̄ (pesos)' : 'Valores de p̂ (proporción)';
+  xlabel.style.top = (axisY + 38) + 'px';
+  xlabel.style.bottom = 'auto';
+  viz.appendChild(xlabel);
+
+  let min, max, param, paramLabel, ticks = [];
+  if(currentView==='xbar'){
+    min = 0; max = 80; param = currentData.mu; paramLabel = 'μ';
+    for(let t=0;t<=80;t+=10) ticks.push({v:t, label:String(t)});
+  } else {
+    min = 0; max = 1; param = currentData.p; paramLabel = 'p';
+    for(let t=0;t<=1.0+1e-9;t+=0.1) ticks.push({v:+t.toFixed(1), label:t.toFixed(1)});
+  }
+  const mapX = v => left + ((v-min)/(max-min))*usable;
+
+  ticks.forEach(t => {
+    const tick = document.createElement('div');
+    tick.className = 'tick';
+    tick.style.left = mapX(t.v) + 'px';
+    tick.style.top = (axisY + 14) + 'px';
+    tick.style.bottom = 'auto';
+    tick.textContent = t.label;
+    viz.appendChild(tick);
+  });
+
+  const line = document.createElement('div');
+  line.className = 'line';
+  line.style.left = mapX(param) + 'px';
+  line.style.top = topY + 'px';
+  line.style.bottom = (viz.clientHeight-axisY) + 'px';
+  viz.appendChild(line);
+
+  const lab = document.createElement('div');
+  lab.className = 'lineLabel';
+  lab.style.left = (mapX(param)-14) + 'px';
+  lab.style.top = '18px';
+  lab.textContent = paramLabel;
+  viz.appendChild(lab);
+
+  const points = stackPoints(data, mapX, axisY, topY);
+  points.forEach(pt => {
+    const dot = document.createElement('div');
+    dot.className = 'dot ' + (currentView==='phat' ? 'phat' : '');
+    dot.style.left = pt.x + 'px';
+    dot.style.top = pt.y + 'px';
+    const label = currentView==='xbar'
+      ? `Muestra ${pt.index}<br>x̄ = ${pt.value.toFixed(2)}`
+      : `Muestra ${pt.index}<br>p̂ = ${pt.value.toFixed(2)}`;
+    const showTip = (ev) => {
+      tip.innerHTML = label;
+      let x, y;
+      if(ev.touches && ev.touches[0]){
+        x = Math.max(10, viz.clientWidth - 190);
+        y = 12;
+      } else {
+        let tx = pt.x + 12;
+        let ty = pt.y - 52;
+        if(tx + 170 > viz.clientWidth) tx = viz.clientWidth - 180;
+        if(ty < 10) ty = 10;
+        x = tx; y = ty;
+      }
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+      tip.style.display = 'block';
+    };
+    const hideTip = () => { tip.style.display = 'none'; };
+    dot.addEventListener('mousedown', showTip);
+    dot.addEventListener('mouseup', hideTip);
+    dot.addEventListener('mouseleave', hideTip);
+    dot.addEventListener('touchstart', showTip, {passive:true});
+    dot.addEventListener('touchend', hideTip, {passive:true});
+    dot.addEventListener('touchcancel', hideTip, {passive:true});
+    viz.appendChild(dot);
+  });
+}
+function downloadValues(){
+  const rows = [['muestra','xbar','phat']];
+  const maxLen = Math.max(currentData.xb.length, currentData.ph.length);
+  for(let i=0;i<maxLen;i++){
+    rows.push([i+1,
+      currentData.xb[i]!==undefined ? currentData.xb[i].toFixed(4) : '',
+      currentData.ph[i]!==undefined ? currentData.ph[i].toFixed(4) : ''
+    ]);
+  }
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'valores_observados_muestras.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById('n').addEventListener('input', ()=>{ updateReadouts(); runSim(); });
+document.getElementById('reps').addEventListener('input', ()=>{ updateReadouts(); runSim(); });
+updateReadouts();
+runSim();
+</script>
+</body>
+</html>
