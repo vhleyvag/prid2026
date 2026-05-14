@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simulador 2 · Estimadores en muestras repetidas</title>
+<style>
+  :root{--azul:#1f4e79;--borde:#263238;--gris:#eef1f4;--panel:#ffffff;--acento:#d9eaf7;--texto:#1b1f23;}
+  *{box-sizing:border-box} body{margin:0;background:var(--gris);font-family:Arial,Helvetica,sans-serif;color:var(--texto);display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:16px;}
+  .frame{width:1280px;height:640px;max-width:96vw;background:#fff;border:6px solid var(--borde);border-radius:22px;box-shadow:0 10px 28px rgba(0,0,0,.22);display:grid;grid-template-columns:26% 48% 24%;gap:12px;padding:14px;overflow:hidden;}
+  .panel{background:var(--panel);border:1px solid #c9d3df;border-radius:14px;padding:12px;min-height:0;overflow:hidden;}.left,.right{display:flex;flex-direction:column;gap:10px}.center{display:flex;flex-direction:column;gap:8px;}
+  h1{font-size:18px;margin:0 0 6px;color:var(--azul)} h2{font-size:15px;margin:0 0 8px;color:var(--azul)} p{font-size:12px;line-height:1.35;margin:4px 0} label{font-size:12px;font-weight:bold;margin-top:2px;display:block} select,button{width:100%;padding:8px;border-radius:10px;border:1px solid #9fb2c6;font-size:13px;background:white} button{background:var(--azul);color:#fff;border:0;cursor:pointer;font-weight:bold} button.secondary{background:#607d8b}.small{font-size:11px;color:#445}.note{background:#f8fbff;border-left:4px solid var(--azul);padding:8px;border-radius:8px;}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{background:var(--acento);border-radius:10px;padding:8px}.stat b{display:block;font-size:11px;color:#28435a}.stat span{font-size:18px;font-weight:bold;color:#0d355c}
+  canvas{width:100%;height:415px;border:1px solid #ccd7e2;border-radius:10px;background:#fff}.historywrap{height:322px;overflow:auto;border:1px solid #ccd7e2;border-radius:10px} table{border-collapse:collapse;width:100%;font-size:11px} th{position:sticky;top:0;background:var(--azul);color:white;padding:5px;text-align:center;z-index:2}td{border-bottom:1px solid #e1e8ef;padding:5px;text-align:center}tr:nth-child(even) td{background:#f7fbfe}.legend{font-size:11px;display:flex;gap:10px;flex-wrap:wrap}.legend span{display:inline-flex;align-items:center;gap:4px}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}.blue{background:#1f77b4}.red{background:#c62828}.gray{background:#95a5a6}
+  @media(max-width:900px){body{padding:8px}.frame{height:auto;grid-template-columns:1fr;overflow:visible}.panel{overflow:visible}canvas{height:300px}.historywrap{height:200px}}
+</style>
+</head>
+<body>
+<div class="frame">
+  <section class="panel left">
+    <h1>Simulador 2</h1>
+    <p><b>Estimadores en muestras repetidas.</b> La gráfica muestra una sola variable a la vez.</p>
+    <div class="note"><p>Los puntos se dibujan solo por encima del eje horizontal. La altura no es otro dato; solo apila puntos para evitar traslape.</p></div>
+    <label for="type">Tipo de estimador</label>
+    <select id="type"><option value="media">Media muestral de Dinero_pesos</option><option value="prop">Proporción muestral de Es_mujer_0_1</option></select>
+    <label for="n">Tamaño de muestra</label>
+    <select id="n"><option value="5">n = 5</option><option value="10">n = 10</option><option value="15">n = 15</option><option value="20">n = 20</option></select>
+    <label for="reps">Muestras por simulación</label>
+    <select id="reps"><option value="5">5 muestras</option><option value="20">20 muestras</option><option value="50">50 muestras</option><option value="100">100 muestras</option></select>
+    <button id="sim">Simular</button><button class="secondary" id="clear">Limpiar puntos</button>
+    <div class="note small"><b>Consigna:</b> compara qué ocurre con los puntos al cambiar n. Describe concentración y cercanía al parámetro.</div>
+  </section>
+  <section class="panel center">
+    <h2 id="chartTitle">Distribución de valores del estimador</h2>
+    <canvas id="chart" width="560" height="415"></canvas>
+    <div class="legend"><span><i class="dot blue"></i>Valor del estimador en una muestra</span><span><i class="dot red"></i>Parámetro poblacional</span><span><i class="dot gray"></i>Apilamiento visual, no variable</span></div>
+  </section>
+  <section class="panel right">
+    <h2>Resumen</h2>
+    <div class="stats">
+      <div class="stat"><b>Parámetro mostrado</b><span id="param"></span></div><div class="stat"><b>Puntos simulados</b><span id="count">0</span></div>
+      <div class="stat"><b>Promedio de estimadores</b><span id="avg">—</span></div><div class="stat"><b>Rango observado</b><span id="range">—</span></div>
+    </div>
+    <h2>Últimos resultados</h2><div class="historywrap"><table id="hist"></table></div>
+    <p class="small">Pequeños desplazamientos horizontales se agregan para mejorar la lectura cuando varios valores son iguales o muy cercanos; no cambian el valor estadístico.</p>
+  </section>
+</div>
+<script>
+const population = [[1,15,20,1],[2,15,35,0],[3,15,0,1],[4,15,50,1],[5,16,60,0],[6,16,25,1],[7,16,80,0],[8,16,10,1],[9,16,45,1],[10,16,30,0],[11,17,70,1],[12,17,15,0],[13,17,90,1],[14,17,40,0],[15,17,55,1],[16,17,5,0],[17,17,120,1],[18,17,65,0],[19,18,100,1],[20,18,20,0],[21,18,75,1],[22,18,35,0],[23,18,110,1],[24,18,45,0],[25,18,85,1],[26,18,15,0],[27,19,130,1],[28,19,60,0],[29,19,95,1],[30,19,25,0],[31,19,150,1],[32,20,40,0],[33,20,70,1],[34,20,10,0],[35,20,115,1],[36,20,55,0],[37,21,160,1],[38,21,30,0],[39,21,105,1],[40,21,65,0]].map(r=>({id:r[0],edad:r[1],dinero:r[2],mujer:r[3]}));
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length; const mu=mean(population.map(d=>d.dinero)); const ppop=mean(population.map(d=>d.mujer)); let points=[];
+function sample(n){let pool=[...population], s=[]; for(let i=0;i<n;i++){let idx=Math.floor(Math.random()*pool.length);s.push(pool.splice(idx,1)[0]);} return s;}
+function estimator(s,type){return type==='media'?mean(s.map(d=>d.dinero)):mean(s.map(d=>d.mujer));}
+function simulate(){const n=+document.getElementById('n').value,reps=+document.getElementById('reps').value,type=document.getElementById('type').value; for(let i=0;i<reps;i++){const s=sample(n);points.push({type,n,value:estimator(s,type),ids:s.map(d=>d.id).join(', ')});} draw();}
+function draw(){const type=document.getElementById('type').value;const data=points.filter(d=>d.type===type);const canvas=document.getElementById('chart'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);const m={l:58,r:22,t:30,b:60};const min=type==='media'?0:0,max=type==='media'?170:1;const param=type==='media'?mu:ppop;document.getElementById('param').textContent=type==='media'?'$'+param.toFixed(2):param.toFixed(3);document.getElementById('chartTitle').textContent=type==='media'?'Valores de medias muestrales de Dinero_pesos':'Valores de proporciones muestrales de Es_mujer_0_1';ctx.strokeStyle='#334';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(m.l,H-m.b);ctx.lineTo(W-m.r,H-m.b);ctx.stroke();ctx.fillStyle='#111';ctx.font='11px Arial';ctx.fillText(type==='media'?'Media muestral de Dinero_pesos':'Proporción muestral de Es_mujer_0_1',m.l,H-20);function xScale(v){return m.l+(v-min)/(max-min)*(W-m.l-m.r)}for(let i=0;i<=10;i++){let v=min+i*(max-min)/10,x=xScale(v);ctx.strokeStyle='#edf2f7';ctx.beginPath();ctx.moveTo(x,m.t);ctx.lineTo(x,H-m.b);ctx.stroke();ctx.fillStyle='#111';ctx.font='10px Arial';ctx.fillText(type==='media'?Math.round(v):v.toFixed(1),x-10,H-42)}let xp=xScale(param);ctx.strokeStyle='#c62828';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(xp,m.t);ctx.lineTo(xp,H-m.b);ctx.stroke();ctx.fillStyle='#c62828';ctx.font='12px Arial';ctx.fillText('Parámetro',Math.min(xp+6,W-90),m.t+14);
+// stack points by rounded bins. Height is only visual.
+const bins={}; data.forEach((d,idx)=>{let key=type==='media'?Math.round(d.value/2)*2:d.value.toFixed(2); if(!bins[key])bins[key]=0; const stack=bins[key]++; const baseX=xScale(d.value); const jitter=((idx%5)-2)*1.8; const x=baseX+jitter; const y=H-m.b-9-stack*7; ctx.fillStyle='#1f77b4';ctx.beginPath();ctx.arc(x,Math.max(m.t+8,y),4.2,0,Math.PI*2);ctx.fill();}); document.getElementById('count').textContent=data.length; if(data.length){const vals=data.map(d=>d.value),av=mean(vals),lo=Math.min(...vals),hi=Math.max(...vals);document.getElementById('avg').textContent=type==='media'?'$'+av.toFixed(2):av.toFixed(3);document.getElementById('range').textContent=(type==='media'?'$':'')+lo.toFixed(type==='media'?2:3)+' a '+(type==='media'?'$':'')+hi.toFixed(type==='media'?2:3);} else {document.getElementById('avg').textContent='—';document.getElementById('range').textContent='—';} renderHist(data.slice(-18).reverse());}
+function renderHist(data){const rows=data.map((d,i)=>`<tr><td>${data.length-i}</td><td>${d.n}</td><td>${d.value.toFixed(d.type==='media'?2:3)}</td><td>${d.ids}</td></tr>`);document.getElementById('hist').innerHTML='<thead><tr><th>#</th><th>n</th><th>Estimador</th><th>ID</th></tr></thead><tbody>'+rows.join('')+'</tbody>';}
+document.getElementById('sim').addEventListener('click',simulate);document.getElementById('clear').addEventListener('click',()=>{const type=document.getElementById('type').value;points=points.filter(d=>d.type!==type);draw();});document.getElementById('type').addEventListener('change',draw);document.getElementById('n').addEventListener('change',()=>{});draw();
+</script>
+</body>
+</html>

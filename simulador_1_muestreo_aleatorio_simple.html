@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simulador 1 · Muestreo aleatorio simple</title>
+<style>
+  :root{--azul:#1f4e79;--borde:#263238;--gris:#eef1f4;--panel:#ffffff;--acento:#d9eaf7;--texto:#1b1f23;}
+  *{box-sizing:border-box} body{margin:0;background:var(--gris);font-family:Arial,Helvetica,sans-serif;color:var(--texto);display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:16px;}
+  .frame{width:1280px;height:640px;max-width:96vw;background:#fff;border:6px solid var(--borde);border-radius:22px;box-shadow:0 10px 28px rgba(0,0,0,.22);display:grid;grid-template-columns:26% 48% 24%;gap:12px;padding:14px;overflow:hidden;}
+  .panel{background:var(--panel);border:1px solid #c9d3df;border-radius:14px;padding:12px;min-height:0;overflow:hidden;}
+  .left,.right{display:flex;flex-direction:column;gap:10px}.center{display:flex;flex-direction:column;gap:8px;}
+  h1{font-size:18px;margin:0 0 6px;color:var(--azul)} h2{font-size:15px;margin:0 0 8px;color:var(--azul)} p{font-size:12px;line-height:1.35;margin:4px 0}
+  label{font-size:12px;font-weight:bold;margin-top:2px;display:block} select,button{width:100%;padding:8px;border-radius:10px;border:1px solid #9fb2c6;font-size:13px;background:white} button{background:var(--azul);color:#fff;border:0;cursor:pointer;font-weight:bold} button.secondary{background:#607d8b}.small{font-size:11px;color:#445}.note{background:#f8fbff;border-left:4px solid var(--azul);padding:8px;border-radius:8px;}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{background:var(--acento);border-radius:10px;padding:8px}.stat b{display:block;font-size:11px;color:#28435a}.stat span{font-size:18px;font-weight:bold;color:#0d355c}
+  .popwrap{height:152px;overflow:auto;border:1px solid #ccd7e2;border-radius:10px}.samplewrap{height:194px;overflow:auto;border:1px solid #ccd7e2;border-radius:10px}.historywrap{height:210px;overflow:auto;border:1px solid #ccd7e2;border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:11px} th{position:sticky;top:0;background:var(--azul);color:white;padding:5px;text-align:center;z-index:2} td{border-bottom:1px solid #e1e8ef;padding:5px;text-align:center} tr:nth-child(even) td{background:#f7fbfe}.highlight{background:#ffe9a8!important;font-weight:bold}.selected td{background:#cde8d0!important}
+  canvas{width:100%;height:235px;border:1px solid #ccd7e2;border-radius:10px;background:#fff}.legend{font-size:11px;display:flex;gap:10px;flex-wrap:wrap}.legend span{display:inline-flex;align-items:center;gap:4px}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}.blue{background:#1f77b4}.orange{background:#ef8a17}.green{background:#2e7d32}
+  .tooltip{position:absolute;pointer-events:none;background:#102a43;color:#fff;padding:6px 8px;border-radius:8px;font-size:11px;display:none;max-width:220px;z-index:20}
+  @media(max-width:900px){body{padding:8px}.frame{height:auto;grid-template-columns:1fr;overflow:visible}.panel{overflow:visible}.popwrap,.samplewrap,.historywrap{height:180px}canvas{height:220px}}
+</style>
+</head>
+<body>
+<div class="frame">
+  <section class="panel left">
+    <h1>Simulador 1</h1>
+    <p><b>Muestreo aleatorio simple</b> de una población conocida.</p>
+    <div class="note"><p>La media muestral se calcula con <b>Dinero_pesos</b>. La proporción muestral se calcula con <b>Es_mujer_0_1</b>.</p></div>
+    <label for="n">Tamaño de muestra</label>
+    <select id="n"><option value="5">n = 5</option><option value="8">n = 8</option><option value="10">n = 10</option><option value="15">n = 15</option></select>
+    <label for="highlight">Variable destacada</label>
+    <select id="highlight"><option value="dinero">Dinero_pesos</option><option value="mujer">Es_mujer_0_1</option><option value="edad">Edad</option></select>
+    <button id="gen">Generar muestra</button>
+    <button class="secondary" id="reset">Reiniciar registro</button>
+    <div class="note small"><b>Consigna:</b> genera varias muestras y copia los identificadores. Verifica si los estimadores son iguales o diferentes entre muestras.</div>
+  </section>
+  <section class="panel center">
+    <h2>Población completa y muestra seleccionada</h2>
+    <div class="popwrap"><table id="popTable"></table></div>
+    <div class="legend"><span><i class="dot green"></i>Casos seleccionados</span><span><i class="dot blue"></i>Media muestral</span><span><i class="dot orange"></i>Proporción muestral</span></div>
+    <canvas id="chart" width="560" height="235"></canvas>
+    <div class="samplewrap"><table id="sampleTable"></table></div>
+  </section>
+  <section class="panel right">
+    <h2>Resultados</h2>
+    <div class="stats">
+      <div class="stat"><b>Media poblacional de Dinero_pesos</b><span id="mu"></span></div>
+      <div class="stat"><b>Proporción poblacional de Es_mujer_0_1</b><span id="p"></span></div>
+      <div class="stat"><b>Media muestral actual</b><span id="xbar">—</span></div>
+      <div class="stat"><b>Proporción muestral actual</b><span id="phat">—</span></div>
+    </div>
+    <h2>Historial de muestras</h2>
+    <div class="historywrap"><table id="histTable"></table></div>
+    <p class="small">Observa si al repetir el muestreo cambian los valores. El parámetro permanece fijo porque se calcula con toda la población.</p>
+  </section>
+</div>
+<div class="tooltip" id="tip"></div>
+<script>
+const population = [
+[1,15,20,1],[2,15,35,0],[3,15,0,1],[4,15,50,1],[5,16,60,0],[6,16,25,1],[7,16,80,0],[8,16,10,1],[9,16,45,1],[10,16,30,0],[11,17,70,1],[12,17,15,0],[13,17,90,1],[14,17,40,0],[15,17,55,1],[16,17,5,0],[17,17,120,1],[18,17,65,0],[19,18,100,1],[20,18,20,0],[21,18,75,1],[22,18,35,0],[23,18,110,1],[24,18,45,0],[25,18,85,1],[26,18,15,0],[27,19,130,1],[28,19,60,0],[29,19,95,1],[30,19,25,0],[31,19,150,1],[32,20,40,0],[33,20,70,1],[34,20,10,0],[35,20,115,1],[36,20,55,0],[37,21,160,1],[38,21,30,0],[39,21,105,1],[40,21,65,0]
+].map(r=>({id:r[0],edad:r[1],dinero:r[2],mujer:r[3],genero:r[3]?'Mujer':'No mujer'}));
+let sample=[], history=[];
+const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+const mu = mean(population.map(d=>d.dinero));
+const ppop = mean(population.map(d=>d.mujer));
+document.getElementById('mu').textContent = '$'+mu.toFixed(2);
+document.getElementById('p').textContent = ppop.toFixed(3);
+function tableHTML(rows, headers){return '<thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody>'}
+function renderPop(){const high=document.getElementById('highlight').value; const ids=new Set(sample.map(d=>d.id)); const rows=population.map(d=>`<tr class="${ids.has(d.id)?'selected':''}"><td>${d.id}</td><td class="${high==='edad'?'highlight':''}">${d.edad}</td><td class="${high==='dinero'?'highlight':''}">${d.dinero}</td><td class="${high==='mujer'?'highlight':''}">${d.mujer}</td><td>${d.genero}</td></tr>`); document.getElementById('popTable').innerHTML=tableHTML(rows,['ID','Edad','Dinero_pesos','Es_mujer_0_1','Género']);}
+function renderSample(){if(sample.length===0){document.getElementById('sampleTable').innerHTML='<tr><td style="padding:18px">Presiona “Generar muestra”.</td></tr>';return;} const rows=sample.map(d=>`<tr><td>${d.id}</td><td>${d.edad}</td><td>${d.dinero}</td><td>${d.mujer}</td><td>${d.genero}</td></tr>`); document.getElementById('sampleTable').innerHTML=tableHTML(rows,['ID','Edad','Dinero_pesos','Es_mujer_0_1','Género']);}
+function renderHist(){const rows=history.map((h,i)=>`<tr><td>${i+1}</td><td>${h.n}</td><td>${h.ids}</td><td>${h.xbar.toFixed(2)}</td><td>${h.phat.toFixed(3)}</td></tr>`); document.getElementById('histTable').innerHTML=tableHTML(rows,['#','n','ID seleccionados','Media','Proporción']);}
+function drawChart(){const canvas=document.getElementById('chart'), ctx=canvas.getContext('2d'), W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);const m={l:48,r:20,t:18,b:42};ctx.strokeStyle='#334';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(m.l,H-m.b);ctx.lineTo(W-m.r,H-m.b);ctx.moveTo(m.l,m.t);ctx.lineTo(m.l,H-m.b);ctx.stroke();ctx.fillStyle='#111';ctx.font='12px Arial';ctx.fillText('Dinero_pesos por ID de población',m.l,14);ctx.font='10px Arial';for(let v=0;v<=160;v+=40){let y=H-m.b-(v/170)*(H-m.t-m.b);ctx.fillText(v,12,y+3);ctx.strokeStyle='#e6edf5';ctx.beginPath();ctx.moveTo(m.l,y);ctx.lineTo(W-m.r,y);ctx.stroke()}const bw=(W-m.l-m.r)/population.length;const ids=new Set(sample.map(d=>d.id));population.forEach((d,i)=>{let x=m.l+i*bw+1;let h=(d.dinero/170)*(H-m.t-m.b);ctx.fillStyle=ids.has(d.id)?'#2e7d32':'#b9c9d9';ctx.fillRect(x,H-m.b-h,Math.max(3,bw-2),h)});ctx.fillStyle='#222';ctx.font='10px Arial';for(let i=0;i<population.length;i+=5){ctx.fillText(String(i+1),m.l+i*bw,H-18)}ctx.fillText('ID',W/2,H-5);ctx.save();ctx.translate(13,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('Dinero_pesos',0,0);ctx.restore(); if(sample.length){const xb=mean(sample.map(d=>d.dinero));const y=H-m.b-(xb/170)*(H-m.t-m.b);ctx.strokeStyle='#1f77b4';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(m.l,y);ctx.lineTo(W-m.r,y);ctx.stroke();ctx.fillStyle='#1f77b4';ctx.fillText('Media muestral = '+xb.toFixed(2),W-165,y-6)}}
+function generate(){const n=+document.getElementById('n').value; let pool=[...population]; sample=[]; for(let i=0;i<n;i++){let idx=Math.floor(Math.random()*pool.length);sample.push(pool.splice(idx,1)[0]);} const xbar=mean(sample.map(d=>d.dinero)); const phat=mean(sample.map(d=>d.mujer)); history.push({n,ids:sample.map(d=>d.id).join(', '),xbar,phat}); document.getElementById('xbar').textContent='$'+xbar.toFixed(2); document.getElementById('phat').textContent=phat.toFixed(3); renderPop(); renderSample(); renderHist(); drawChart();}
+document.getElementById('gen').addEventListener('click',generate);document.getElementById('reset').addEventListener('click',()=>{sample=[];history=[];document.getElementById('xbar').textContent='—';document.getElementById('phat').textContent='—';renderPop();renderSample();renderHist();drawChart();});document.getElementById('highlight').addEventListener('change',renderPop);
+renderPop();renderSample();renderHist();drawChart();
+</script>
+</body>
+</html>
