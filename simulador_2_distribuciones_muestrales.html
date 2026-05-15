@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador 2 · Distribuciones muestrales y z</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#e8ebef;font-family:Arial,sans-serif;color:#1b2733;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:12px}
+  .frame{width:1280px;height:640px;max-width:100%;background:white;border:8px solid #1f2937;border-radius:24px;box-shadow:0 12px 30px rgba(0,0,0,.18);display:grid;grid-template-columns:26% 48% 24%;gap:12px;padding:14px;overflow:hidden}
+  .panel{border:1px solid #c9d3df;border-radius:16px;padding:14px;background:#f9fbfd;overflow:hidden}
+  .panel h2{margin:0 0 10px;font-size:20px;color:#1f4e79}
+  label{display:block;font-size:13px;margin-top:10px;font-weight:700}
+  select,input{width:100%;padding:7px;border:1px solid #94a3b8;border-radius:8px;background:#fff}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn{margin-top:10px;width:100%;border:0;border-radius:10px;padding:9px;background:#1f4e79;color:white;font-weight:700;cursor:pointer}
+  .btn.light{background:#0f766e}
+  .note{font-size:12px;line-height:1.25;background:#eef6ff;border-left:4px solid #1f4e79;padding:8px;border-radius:8px}
+  .warn{font-size:11px;color:#9a3412;min-height:15px;margin-top:5px;line-height:1.2}
+  .stat{display:grid;grid-template-columns:1fr auto;gap:6px;font-size:13px;border-bottom:1px solid #d7e0ea;padding:5px 0}.stat b{color:#1f4e79}
+  .viz{height:100%;display:grid;grid-template-rows:36px 1fr 60px;gap:8px}.title{text-align:center;font-weight:700;color:#1f4e79}
+  canvas{width:100%;height:100%;background:white;border-radius:14px;border:1px solid #dbe4ee}
+  .mini{font-size:11px;color:#475569;line-height:1.25}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#e2e8f0;margin:2px;font-size:12px}
+  @media(max-width:900px){.frame{height:auto;grid-template-columns:1fr;overflow:visible}.panel{min-height:260px}.viz{height:560px}}
+</style>
+</head>
+<body>
+<div class="frame">
+  <section class="panel">
+    <h2>Controles</h2>
+    <label>Gráfica visible</label>
+    <select id="mode">
+      <option value="mean">Medias muestrales</option>
+      <option value="prop">Proporciones muestrales</option>
+    </select>
+    <div class="row">
+      <div><label>Tamaño de muestra n<br><span class="mini">Rango permitido: 5 a 100</span></label><input id="n" type="number" min="5" max="100" value="30"></div>
+      <div><label>Número de muestras<br><span class="mini">Rango permitido: 50 a 1200</span></label><input id="reps" type="number" min="50" max="1200" step="50" value="350"></div>
+    </div>
+    <div id="rangeMsg" class="warn"></div>
+    <label>Valor observado para estandarizar</label>
+    <input id="obs" type="number" step="0.01" value="70">
+    <button class="btn" onclick="simulate()">Construir distribución</button>
+    <button class="btn light" onclick="newFixedPopulation()">Generar nueva población fija</button>
+    <h2 style="margin-top:14px">Pregunta guía</h2>
+    <div class="note">¿El valor observado queda cerca del centro o en una zona poco común de la distribución muestral?</div>
+    <p class="mini">La población se mantiene fija al presionar “Construir distribución”. Sólo cambia si se presiona “Generar nueva población fija”.</p>
+  </section>
+  <section class="panel viz">
+    <div class="title" id="chartTitle">Distribución muestral</div>
+    <canvas id="canvas" width="590" height="500"></canvas>
+    <div>
+      <span class="pill">Cada punto = una muestra simulada</span>
+      <span class="pill">Altura = apilamiento visual</span>
+      <span class="pill">Eje horizontal = media o proporción</span>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Resultados</h2>
+    <div id="results"></div>
+    <h2 style="margin-top:16px">Lectura del valor z</h2>
+    <div id="interp" class="note">Simula para ver el valor z.</div>
+    <p class="mini">Los puntos se apilan hacia arriba únicamente para que no se encimen. La altura no representa una segunda variable ni un valor estadístico adicional.</p>
+  </section>
+</div>
+<script>
+let pop=[],bin=[];
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function mean(a){return a.reduce((s,x)=>s+x,0)/a.length}
+function sd(a){let m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/a.length)}
+function sample(arr,n){let o=[];for(let i=0;i<n;i++)o.push(arr[Math.floor(Math.random()*arr.length)]);return o}
+function makePop(){pop=[];bin=[];for(let i=0;i<800;i++){let x=30+Math.pow(Math.random(),1.7)*90+randn()*5;pop.push(Math.max(5,Math.min(150,x)));bin.push(Math.random()<.42?1:0)}}
+function ensurePop(){if(pop.length===0||bin.length===0)makePop()}
+function clampValue(id,min,max,defaultValue,step){const el=document.getElementById(id);let v=Number(el.value);let msg='';if(!Number.isFinite(v)){v=defaultValue;msg=`Se usó ${defaultValue} porque la entrada no era válida.`}if(v<min){v=min;msg=`Se ajustó ${id==='n'?'n':'el número de muestras'} al mínimo permitido: ${min}.`}if(v>max){v=max;msg=`Se ajustó ${id==='n'?'n':'el número de muestras'} al máximo permitido: ${max}.`}if(step){v=Math.round(v/step)*step;v=Math.max(min,Math.min(max,v));}el.value=v;if(msg)document.getElementById('rangeMsg').textContent=msg;return v}
+function validateControls(){document.getElementById('rangeMsg').textContent='';const n=clampValue('n',5,100,30,1);const reps=clampValue('reps',50,1200,350,50);return {n,reps}}
+function normalY(x,mu,s){return Math.exp(-.5*Math.pow((x-mu)/s,2))/(s*Math.sqrt(2*Math.PI))}
+function drawDot(vals,mu,se,obs,mode){const c=document.getElementById('canvas'),ctx=c.getContext('2d'),w=c.width,h=c.height,l=64,b=64;ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);let min=Math.min(...vals,mu-4*se,obs),max=Math.max(...vals,mu+4*se,obs);if(max===min)max=min+1;ctx.strokeStyle='#263445';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(l,35);ctx.lineTo(l,h-b);ctx.lineTo(w-25,h-b);ctx.stroke();ctx.save();ctx.translate(16,h/2);ctx.rotate(-Math.PI/2);ctx.fillStyle='#111827';ctx.font='11px Arial';ctx.textAlign='center';ctx.fillText('Apilamiento visual de puntos',0,0);ctx.restore();ctx.fillStyle='#1f4e79';ctx.font='bold 14px Arial';ctx.textAlign='center';ctx.fillText(mode==='mean'?'Distribución muestral de medias':'Distribución muestral de proporciones',w/2,22);let bins={};vals.forEach(v=>{let key=Math.round((v-min)/(max-min)*120);bins[key]=(bins[key]||0)+1;let x=l+(v-min)/(max-min)*(w-l-35)+(Math.random()-.5)*4;let y=h-b-6-bins[key]*5;ctx.beginPath();ctx.arc(x,Math.max(40,y),2.4,0,Math.PI*2);ctx.fillStyle='#477da8';ctx.fill();});ctx.strokeStyle='#c2410c';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<220;i++){let val=min+(max-min)*i/219;let dens=normalY(val,mu,se);let y=h-b-(dens/normalY(mu,mu,se))*(h-b-65);let x=l+(val-min)/(max-min)*(w-l-35);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.stroke();let xo=l+(obs-min)/(max-min)*(w-l-35);ctx.strokeStyle='#7c2d12';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(xo,35);ctx.lineTo(xo,h-b);ctx.stroke();ctx.fillStyle='#7c2d12';ctx.font='12px Arial';ctx.fillText('valor observado',xo,34);ctx.fillStyle='#111827';ctx.font='11px Arial';ctx.textAlign='center';for(let i=0;i<=5;i++){let val=min+(max-min)*i/5;let x=l+(w-l-35)*i/5;ctx.fillText(mode==='mean'?val.toFixed(1):val.toFixed(2),x,h-39)}ctx.fillText(mode==='mean'?'medias muestrales':'proporciones muestrales',w/2,h-14)}
+function simulate(){ensurePop();const mode=document.getElementById('mode').value;const {n,reps}=validateControls();let arr=mode==='mean'?pop:bin;let vals=[];for(let r=0;r<reps;r++)vals.push(mean(sample(arr,n)));let param=mean(arr);let sigma=mode==='mean'?sd(pop):Math.sqrt(param*(1-param));let se=sigma/Math.sqrt(n);let obs=Number(document.getElementById('obs').value);if(!Number.isFinite(obs)){obs=mode==='mean'?param:param}if(mode==='prop'&&obs>1)obs=obs/100;document.getElementById('obs').value=mode==='mean'?obs.toFixed(1):obs.toFixed(2);let z=(obs-param)/se;drawDot(vals,param,se,obs,mode);document.getElementById('results').innerHTML=`<div class="stat"><span>Parámetro poblacional fijo</span><b>${param.toFixed(3)}</b></div><div class="stat"><span>Error estándar</span><b>${se.toFixed(3)}</b></div><div class="stat"><span>Promedio simulado</span><b>${mean(vals).toFixed(3)}</b></div><div class="stat"><span>Dispersión simulada</span><b>${sd(vals).toFixed(3)}</b></div><div class="stat"><span>Valor observado</span><b>${obs.toFixed(3)}</b></div><div class="stat"><span>Valor z</span><b>${z.toFixed(2)}</b></div><div class="stat"><span>Puntos graficados</span><b>${reps}</b></div>`;document.getElementById('interp').innerHTML=`Cada punto representa el estadístico de una muestra simulada. El valor observado está a <b>${z.toFixed(2)}</b> errores estándar del parámetro fijo. Mientras más lejos esté de 0, menos común resulta bajo el modelo normal aproximado.`;}
+function newFixedPopulation(){makePop();simulate()}
+document.getElementById('mode').addEventListener('change',()=>{document.getElementById('obs').value=document.getElementById('mode').value==='mean'?'70':'0.45';simulate()});
+document.getElementById('n').addEventListener('blur',()=>validateControls());
+document.getElementById('reps').addEventListener('blur',()=>validateControls());
+makePop();simulate();
+</script>
+</body>
+</html>

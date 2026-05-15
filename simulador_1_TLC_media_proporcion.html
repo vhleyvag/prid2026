@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador 1 · TLC para media y proporción</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#e8ebef;font-family:Arial, sans-serif;color:#1b2733;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:12px}
+  .frame{width:1280px;height:640px;max-width:100%;background:white;border:8px solid #1f2937;border-radius:24px;box-shadow:0 12px 30px rgba(0,0,0,.18);display:grid;grid-template-columns:26% 48% 24%;gap:12px;padding:14px;overflow:hidden}
+  .panel{border:1px solid #c9d3df;border-radius:16px;padding:14px;background:#f9fbfd;overflow:hidden}
+  .panel h2{margin:0 0 10px;font-size:20px;color:#1f4e79}.panel h3{font-size:15px;margin:10px 0 8px;color:#1f4e79}
+  label{display:block;font-size:13px;margin-top:10px;font-weight:700}select,input{width:100%;padding:7px;border:1px solid #94a3b8;border-radius:8px;background:#fff}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn{margin-top:10px;width:100%;border:0;border-radius:10px;padding:9px;background:#1f4e79;color:white;font-weight:700;cursor:pointer}.btn.secondary{background:#64748b}.btn.light{background:#0f766e}
+  .note{font-size:12px;line-height:1.25;background:#eef6ff;border-left:4px solid #1f4e79;padding:8px;border-radius:8px}.warn{font-size:11px;color:#9a3412;min-height:14px;margin-top:5px}
+  .tooltip{position:fixed;z-index:9999;display:none;max-width:260px;background:#111827;color:#fff;border-radius:12px;padding:9px 11px;font-size:12px;line-height:1.35;box-shadow:0 10px 24px rgba(0,0,0,.28);pointer-events:none}
+  .tooltip b{color:#bfdbfe}
+  .stat{display:grid;grid-template-columns:1fr auto;gap:6px;font-size:13px;border-bottom:1px solid #d7e0ea;padding:5px 0}.stat b{color:#1f4e79}
+  canvas{width:100%;height:100%;background:white;border-radius:14px;border:1px solid #dbe4ee}.viz{height:100%;display:grid;grid-template-rows:36px 1fr 1fr;gap:8px}.title{text-align:center;font-weight:700;color:#1f4e79}.legend{font-size:12px;margin-top:8px;line-height:1.3}.mini{font-size:11px;color:#475569}
+  @media(max-width:900px){.frame{height:auto;grid-template-columns:1fr;overflow:visible}.panel{min-height:260px}.viz{height:560px}}
+</style>
+</head>
+<body>
+<div class="frame">
+  <section class="panel">
+    <h2>Controles</h2>
+    <label>Estadístico a construir</label>
+    <select id="statType"><option value="mean">Media muestral de Tiempo_traslado_min</option><option value="prop">Proporción muestral de Traslado_mayor_60_0_1</option></select>
+    <label>Forma de la población cuantitativa</label>
+    <select id="popShape">
+      <option value="normal">Aproximadamente normal</option>
+      <option value="rightSkew">Sesgada a la derecha</option>
+      <option value="leftSkew">Sesgada a la izquierda</option>
+      <option value="uniform">Uniforme</option>
+      <option value="bimodal">Bimodal</option>
+    </select>
+    <div class="row"><div><label>Tamaño de muestra n</label><input id="n" type="number" min="5" max="80" value="10"></div><div><label>Número de muestras</label><input id="reps" type="number" min="50" max="1000" step="50" value="200"></div></div>
+    <div id="rangeMsg" class="warn"></div>
+    <button class="btn" onclick="runSim()">Simular muestras</button>
+    <button class="btn light" onclick="newFixedPopulation()">Generar nueva población fija</button>
+    <button class="btn secondary" onclick="resetGraphs()">Limpiar gráficas</button>
+    <h3>Pregunta guía</h3><div class="note">Antes de simular, escribe una conjetura: ¿qué cambiará en la distribución muestral cuando aumente n?</div>
+    <div class="legend"><b>Lectura:</b> la población permanece fija mientras se repiten las muestras. Puedes elegir si la población cuantitativa será aproximadamente normal, sesgada a la derecha, sesgada a la izquierda, uniforme o bimodal. El eje vertical de las gráficas indica frecuencia: cuántos valores caen en cada intervalo.</div>
+  </section>
+  <section class="panel viz"><div class="title">Población fija y distribución muestral</div><canvas id="popCanvas" width="590" height="245"></canvas><canvas id="sampleCanvas" width="590" height="300"></canvas></section>
+  <section class="panel"><h2>Resultados</h2><div id="results"></div><h3>Interpretación</h3><div id="interp" class="note">Ejecuta la simulación y compara el centro y la dispersión para distintos tamaños de muestra.</div><h3>Condiciones TLC</h3><div class="mini">Muestreo aleatorio, independencia razonable y tamaño de muestra suficiente. Para proporciones, revisar que n·p y n·(1-p) sean cercanos o mayores a 10.</div></section>
+</div>
+<div id="chartTooltip" class="tooltip"></div>
+<script>
+let population=[]; let binary=[]; const P=0.42; let currentShape='';
+const chartBars={popCanvas:[],sampleCanvas:[]};
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function shapeLabel(shape){return {'normal':'aproximadamente normal','rightSkew':'sesgada a la derecha','leftSkew':'sesgada a la izquierda','uniform':'uniforme','bimodal':'bimodal'}[shape] || 'aproximadamente normal'}
+function makePopulation(){const shape=document.getElementById('popShape').value; currentShape=shape; population=[]; binary=[]; for(let i=0;i<600;i++){let x; if(shape==='normal'){x=65+randn()*16;} else if(shape==='rightSkew'){x=20+Math.pow(Math.random(),2)*110+Math.random()*18;} else if(shape==='leftSkew'){x=150-(20+Math.pow(Math.random(),2)*110+Math.random()*18);} else if(shape==='uniform'){x=20+Math.random()*100;} else if(shape==='bimodal'){x=(Math.random()<.55?35+randn()*9:85+randn()*12);} else {x=65+randn()*16;} x=Math.max(5,Math.min(150,x)); population.push(x); binary.push(Math.random()<P?1:0)} }
+function ensurePopulation(){const shape=document.getElementById('popShape').value; if(population.length===0 || shape!==currentShape){makePopulation();}}
+function clampValue(id,min,max,defaultValue,step){const el=document.getElementById(id); let v=Number(el.value); let msg=''; if(!Number.isFinite(v)){v=defaultValue; msg=`Se usó el valor ${defaultValue} porque la entrada no era válida.`} if(v<min){v=min; msg=`Se ajustó ${id==='n'?'n':'el número de muestras'} al mínimo permitido: ${min}.`} if(v>max){v=max; msg=`Se ajustó ${id==='n'?'n':'el número de muestras'} al máximo permitido: ${max}.`} if(step){v=Math.round(v/step)*step; v=Math.max(min,Math.min(max,v));} el.value=v; if(msg) document.getElementById('rangeMsg').textContent=msg; return v;}
+function validateControls(){document.getElementById('rangeMsg').textContent=''; const n=clampValue('n',5,80,10,1); const reps=clampValue('reps',50,1000,200,50); return {n,reps};}
+function mean(a){return a.reduce((s,x)=>s+x,0)/a.length} function sd(a){let m=mean(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/a.length)}
+function sample(arr,n){let out=[]; for(let i=0;i<n;i++) out.push(arr[Math.floor(Math.random()*arr.length)]); return out}
+function hist(data,bins,min,max){let h=Array(bins).fill(0); data.forEach(x=>{let k=Math.floor((x-min)/(max-min)*bins); if(k<0)k=0; if(k>=bins)k=bins-1; h[k]++}); return h}
+function axes(ctx,w,h,l,b,title,ylab){ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#263445';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(l,22);ctx.lineTo(l,h-b);ctx.lineTo(w-20,h-b);ctx.stroke();ctx.fillStyle='#1f4e79';ctx.font='bold 14px Arial';ctx.textAlign='center';ctx.fillText(title,w/2,17);ctx.save();ctx.translate(15,h/2);ctx.rotate(-Math.PI/2);ctx.font='11px Arial';ctx.fillStyle='#111827';ctx.fillText(ylab,0,0);ctx.restore();}
+function drawHist(canvas,data,title,xlab){const ctx=canvas.getContext('2d'), w=canvas.width,h=canvas.height,l=72,b=42;let min=Math.min(...data),max=Math.max(...data); if(max===min){max=min+1} let bins=22, hh=hist(data,bins,min,max), maxh=Math.max(...hh,1);axes(ctx,w,h,l,b,title,'Frecuencia (conteo)');let bw=(w-l-30)/bins;chartBars[canvas.id]=[];hh.forEach((v,i)=>{let x=l+i*bw+2,y=h-b-(v/maxh)*(h-b-38);let barW=bw-4, barH=h-b-y;ctx.fillStyle='#5b8db8';ctx.fillRect(x,y,barW,barH);let a=min+(max-min)*i/bins;let c=min+(max-min)*(i+1)/bins;chartBars[canvas.id].push({x,y,w:barW,h:barH,base:h-b,title,xlab,from:a,to:c,frequency:v,total:data.length,kind:'población'});});ctx.fillStyle='#111827';ctx.font='11px Arial';ctx.textAlign='center';for(let i=0;i<=4;i++){let val=min+(max-min)*i/4;let x=l+(w-l-30)*i/4;ctx.fillText(val.toFixed(1),x,h-20)}ctx.fillText(xlab,w/2,h-5);}
+function normalY(x,mu,s){return Math.exp(-0.5*Math.pow((x-mu)/s,2))/(s*Math.sqrt(2*Math.PI))}
+function drawSample(canvas,data,title,xlab,theoryMean,theorySE){const ctx=canvas.getContext('2d'), w=canvas.width,h=canvas.height,l=72,b=44;let min=Math.min(...data,theoryMean-4*theorySE),max=Math.max(...data,theoryMean+4*theorySE);let bins=24, hh=hist(data,bins,min,max), maxh=Math.max(...hh,1);axes(ctx,w,h,l,b,title,'Frecuencia (conteo)');let bw=(w-l-30)/bins;chartBars[canvas.id]=[];hh.forEach((v,i)=>{let x=l+i*bw+2,y=h-b-(v/maxh)*(h-b-40);let barW=bw-4, barH=h-b-y;ctx.fillStyle='#6aa76f';ctx.fillRect(x,y,barW,barH);let a=min+(max-min)*i/bins;let c=min+(max-min)*(i+1)/bins;chartBars[canvas.id].push({x,y,w:barW,h:barH,base:h-b,title,xlab,from:a,to:c,frequency:v,total:data.length,kind:'distribución muestral'});});ctx.strokeStyle='#c2410c';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<200;i++){let val=min+(max-min)*i/199;let dens=normalY(val,theoryMean,theorySE);let y=h-b-(dens/normalY(theoryMean,theoryMean,theorySE))*(h-b-48);let x=l+(val-min)/(max-min)*(w-l-30); if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.stroke();ctx.fillStyle='#111827';ctx.font='11px Arial';ctx.textAlign='center';for(let i=0;i<=4;i++){let val=min+(max-min)*i/4;let x=l+(w-l-30)*i/4;ctx.fillText(val.toFixed(2),x,h-22)}ctx.fillText(xlab,w/2,h-6);ctx.fillStyle='#c2410c';ctx.fillText('Referencia normal escalada',w-125,28)}
+
+function formatNumber(x){return Math.abs(x)>=10?x.toFixed(1):x.toFixed(3)}
+function showBarPopup(event,bar){const tip=document.getElementById('chartTooltip');const rel=bar.total?100*bar.frequency/bar.total:0;tip.innerHTML=`<b>${bar.title}</b><br>Tipo: ${bar.kind}<br>Intervalo en eje horizontal: ${formatNumber(bar.from)} a ${formatNumber(bar.to)} ${bar.xlab}<br>Frecuencia: ${bar.frequency} caso(s)<br>Frecuencia relativa: ${rel.toFixed(1)}%`;let left=event.clientX+14, top=event.clientY+14;tip.style.display='block';tip.style.left=left+'px';tip.style.top=top+'px';const rect=tip.getBoundingClientRect();if(rect.right>window.innerWidth-8){tip.style.left=(event.clientX-rect.width-14)+'px'}if(rect.bottom>window.innerHeight-8){tip.style.top=(event.clientY-rect.height-14)+'px'}}
+function hideBarPopup(){document.getElementById('chartTooltip').style.display='none'}
+function handleCanvasClick(event){const canvas=event.currentTarget;const rect=canvas.getBoundingClientRect();const scaleX=canvas.width/rect.width, scaleY=canvas.height/rect.height;const x=(event.clientX-rect.left)*scaleX, y=(event.clientY-rect.top)*scaleY;const bars=chartBars[canvas.id]||[];for(const bar of bars){if(bar.frequency>0 && x>=bar.x && x<=bar.x+bar.w && y>=bar.y && y<=bar.base){showBarPopup(event,bar);return}}hideBarPopup()}
+function setupBarPopups(){['popCanvas','sampleCanvas'].forEach(id=>{document.getElementById(id).addEventListener('click',handleCanvasClick)});document.addEventListener('click',event=>{if(!event.target.closest('canvas')) hideBarPopup()});}
+
+function runSim(){ensurePopulation(); const statType=document.getElementById('statType').value; const {n,reps}=validateControls(); let vals=[]; for(let r=0;r<reps;r++){vals.push(mean(sample(statType==='mean'?population:binary,n)))} let mu= statType==='mean'?mean(population):mean(binary); let sigma=statType==='mean'?sd(population):Math.sqrt(mu*(1-mu)); let se=sigma/Math.sqrt(n); drawHist(document.getElementById('popCanvas'),statType==='mean'?population:binary,statType==='mean'?`Distribución de la población fija: ${shapeLabel(currentShape)}`:'Distribución de la población fija: variable 0/1',statType==='mean'?'minutos':'0 = no, 1 = sí'); drawSample(document.getElementById('sampleCanvas'),vals,statType==='mean'?'Distribución muestral de medias':'Distribución muestral de proporciones',statType==='mean'?'medias muestrales':'proporciones muestrales',mu,se); const empMean=mean(vals), empSd=sd(vals); document.getElementById('results').innerHTML=`<div class="stat"><span>Parámetro poblacional</span><b>${mu.toFixed(3)}</b></div><div class="stat"><span>Promedio de estadísticos simulados</span><b>${empMean.toFixed(3)}</b></div><div class="stat"><span>Dispersión simulada de estadísticos</span><b>${empSd.toFixed(3)}</b></div><div class="stat"><span>Error estándar teórico</span><b>${se.toFixed(3)}</b></div><div class="stat"><span>Forma de población cuantitativa</span><b>${shapeLabel(currentShape)}</b></div><div class="stat"><span>Tamaño n</span><b>${n}</b></div><div class="stat"><span>Muestras repetidas</span><b>${reps}</b></div>`; document.getElementById('interp').innerHTML=`Compara este resultado con otro tamaño de muestra. La población no cambia al presionar “Simular muestras”; sólo se repite el muestreo. El centro debe mantenerse cerca del parámetro, mientras que la dispersión de los estadísticos suele reducirse al aumentar n.`;}
+function newFixedPopulation(){makePopulation(); resetGraphs(false); runSim();}
+function resetGraphs(clearPopulation=false){if(clearPopulation){population=[];binary=[];currentShape='';}document.getElementById('results').innerHTML='';document.getElementById('interp').innerHTML='Ejecuta la simulación y compara el centro y la dispersión para distintos tamaños de muestra.';['popCanvas','sampleCanvas'].forEach(id=>{const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height)});}
+document.getElementById('n').addEventListener('blur',()=>validateControls());
+document.getElementById('reps').addEventListener('blur',()=>validateControls());
+document.getElementById('popShape').addEventListener('change',()=>{makePopulation(); runSim();});
+document.getElementById('statType').addEventListener('change',()=>runSim());
+setupBarPopups();
+makePopulation(); runSim();
+</script></body></html>
